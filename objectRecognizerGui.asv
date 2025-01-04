@@ -220,16 +220,15 @@ function enhanceTumorEdges_Callback(hObject, eventdata, handles)
 
 % Check if the image is loaded
 if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
-    % Check if GrayImage is already stored 
-    % (Uncomment below if you need to get the more optimized filtering)
-    % if isfield(handles, 'GrayImage') && ~isempty(handles.GrayImage)
-    %     img = handles.GrayImage; % Use the pre-stored grayscale image
-    % else
-    img = handles.ImageData; % Retrieve the originally uploaded image
-    if size(img, 3) == 3 % Check if it's RGB
-        img = rgb2gray(img); % Convert to grayscale if needed
+    % Check if GrayImage is already stored
+    if isfield(handles, 'GrayImage') && ~isempty(handles.GrayImage)
+        img = handles.GrayImage; % Use the pre-stored grayscale image
+    else
+        img = handles.ImageData; % Retrieve the originally uploaded image
+        if size(img, 3) == 3 % Check if it's RGB
+            img = rgb2gray(img); % Convert to grayscale if needed
+        end
     end
-    % end
 
     % Thresholding: Adaptive thresholding for binarization
     binarizedImg = imbinarize(img, 'adaptive', 'Sensitivity', 0.59);
@@ -249,7 +248,7 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     % Calculating the center of the image
     xCenter = xSize / 2; % Horizontal center coordinate
     yCenter = ySize / 2; % Vertical center coordinate
-
+    
     % Defining radius for an elliptical mask
     xRadius = xCenter - 40; % Horizontal radius of the ellipse (adjusted a bit smaller than half the width)
     yRadius = yCenter - 50; % Vertical radius of the ellipse (adjusted a bit smaller than half the height)
@@ -257,18 +256,11 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     % Create a grid of coordinates representing the image dimensions
     % obtained above
     [col, row] = meshgrid(1:xSize, 1:ySize);
-    % Generate an elliptical mask
     mask = ((row - yCenter).^2 ./ yRadius^2) + ((col - xCenter).^2 ./ xRadius^2) <= 1;
-    % Apply elliptical mask to the enhanced image to isolate the tumor area
-    % Logical operation ensures the result is a binary image
     tumorMask = logical(enhancedImg .* mask);
-    % Filtering connected components based on size
     tumorMask = bwareafilt(tumorMask, [700 4000]);
-
-    % Perform morphological closing to smoothen the boundaries and fill small gaps
     maskStructuring = strel('disk', 6);
     tumorMask = imclose(tumorMask, maskStructuring);
-    % Fills the remaining holes
     tumorMask = imfill(tumorMask, 'holes');
 
     % Display the enhanced image, which went through Thresholding,
@@ -281,7 +273,7 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     axes(handles.tumorDetectionMask);
     imshow(tumorMask);
     title('Tumor Detection Mask');
-
+    
     hold on;
     % Detect and overlay boundaries
     boundaries = bwboundaries(tumorMask, 'noholes');
