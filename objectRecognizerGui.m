@@ -92,9 +92,6 @@ end
 cla(handles.histogramAxes, 'reset');
 cla(handles.enhancedImage, 'reset');
 cla(handles.tumorDetectionMask, 'reset');
-set(handles.contrastDisplayText, 'String', 'Contrast: ');
-set(handles.weightsText, 'String', 'Weights: ');
-set(handles.maxContrast, 'String', 'Maximum Contrast: ');
 
 % Getting the full path of the selected file
 fullPath = fullfile(filePath, fileName);
@@ -143,11 +140,74 @@ function calculateContrastBtn_Callback(hObject, eventdata, handles)
 
 % Checking if image data is loaded
 if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
-    % Calculate the contrast using the RMS method
-    contrastValue = calculateRMSContrast(handles.ImageData);
+    img = handles.ImageData;
 
-    % Display the contrast value
-    set(handles.contrastDisplayText, 'String', sprintf('Contrast: %.4f', contrastValue));
+    % Determine if the image is grayscale or RGB
+    [~, ~, numChannels] = size(img);
+
+    if numChannels == 1
+        % If grayscale, use it as is
+        grayImg = img;
+    elseif numChannels == 3
+        % If RGB, calculate grayscale for different weight combinations
+        grayImg = []; % Placeholder, will calculate inside the loop
+    else
+        % Invalid image format
+        errordlg('Unexpected image format. Please upload a valid image.', 'Image Format Error');
+        return;
+    end
+
+    % Set the range for red, green, and blue weights (between 0 and 1)
+    weightRange = 0:0.1:1;
+
+    % Initialize a table for storing results
+    contrastTable = cell(numel(weightRange)^3, 4); % Adjust table size
+    rowIndex = 1;
+
+    % Compute RMS contrast for each weight combination
+    for rWeight = weightRange
+        for gWeight = weightRange
+            for bWeight = weightRange
+                if numChannels == 3
+                    % Weighted grayscale conversion for RGB images
+                    grayImg = uint8( ...
+                        rWeight * double(img(:, :, 1)) + ...
+                        gWeight * double(img(:, :, 2)) + ...
+                        bWeight * double(img(:, :, 3)) ...
+                        );
+                end
+
+                % Normalize grayscale image to [0, 1]
+                grayImg = double(grayImg) / 255;
+
+                % Calculate RMS contrast
+                meanLuminance = mean(grayImg(:));
+                rmsContrast = sqrt(mean((grayImg(:) - meanLuminance).^2));
+
+                % Round RMS contrast to 4 decimal places and format as a string
+                rmsContrast = sprintf('%.4f', rmsContrast);
+
+                % Store results in the table
+                contrastTable{rowIndex, 1} = rWeight;
+                contrastTable{rowIndex, 2} = gWeight;
+                contrastTable{rowIndex, 3} = bWeight;
+                contrastTable{rowIndex, 4} = rmsContrast;
+
+
+                rowIndex = rowIndex + 1;
+            end
+        end
+    end
+
+    % Display the contrast results in the table with tag 'weightsTable'
+    weightsTableHandle = findobj(handles.figure1, 'Tag', 'weightsTable');
+    if ~isempty(weightsTableHandle)
+        set(weightsTableHandle, 'Data', contrastTable, ...
+            'ColumnName', {'Red Weight', 'Green Weight', 'Blue Weight', 'RMS Contrast'});
+    else
+        errordlg('Something Went Wrong!', 'Table Error');
+    end
+
 else
     % Show error if no image is loaded
     errordlg('No image uploaded. Please upload an image.', 'Image Not Loaded');
@@ -171,12 +231,6 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     axes(handles.uploadImageAxes);
     imshow(grayImage, []);
     title(handles.uploadImageAxes, 'Grayscale Image');
-
-    % Display the weights
-    set(handles.weightsText, 'String', ...
-        sprintf('Weights: R=%.4f, G=%.4f, B=%.4f', weights(1), weights(2), weights(3)));
-    set(handles.maxContrast, 'String', ...
-        sprintf('Maximum Contrast: %.4f', weights(4)));
 else
     % Show error if no image is loaded
     errordlg('No image uploaded. Please upload an image.', 'Image Not Loaded');
@@ -220,7 +274,7 @@ function enhanceTumorEdges_Callback(hObject, eventdata, handles)
 
 % Check if the image is loaded
 if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
-    % Check if GrayImage is already stored 
+    % Check if GrayImage is already stored
     % (Uncomment below if you need to get the more optimized filtering)
     % if isfield(handles, 'GrayImage') && ~isempty(handles.GrayImage)
     %     img = handles.GrayImage; % Use the pre-stored grayscale image
