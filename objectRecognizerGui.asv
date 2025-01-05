@@ -143,15 +143,76 @@ function calculateContrastBtn_Callback(hObject, eventdata, handles)
 
 % Checking if image data is loaded
 if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
-    % Calculate the contrast using the RMS method
-    contrastValue = calculateRMSContrast(handles.ImageData);
+    img = handles.ImageData;
 
-    % Display the contrast value
-    set(handles.contrastDisplayText, 'String', sprintf('Contrast: %.4f', contrastValue));
+    % Determine if the image is grayscale or RGB
+    [~, ~, numChannels] = size(img);
+
+    if numChannels == 1
+        % If grayscale, use it as is
+        grayImg = img;
+    elseif numChannels == 3
+        % If RGB, calculate grayscale for different weight combinations
+        grayImg = []; % Placeholder, will calculate inside the loop
+    else
+        % Invalid image format
+        errordlg('Unexpected image format. Please upload a valid image.', 'Image Format Error');
+        return;
+    end
+
+    % Set the range for red, green, and blue weights (between 0 and 1)
+    weightRange = 0:0.1:1;
+
+    % Initialize a table for storing results
+    contrastTable = cell(numel(weightRange)^3, 4); % Adjust table size
+    rowIndex = 1;
+
+    % Compute RMS contrast for each weight combination
+    for rWeight = weightRange
+        for gWeight = weightRange
+            for bWeight = weightRange
+                if numChannels == 3
+                    % Weighted grayscale conversion for RGB images
+                    grayImg = uint8( ...
+                        rWeight * double(img(:, :, 1)) + ...
+                        gWeight * double(img(:, :, 2)) + ...
+                        bWeight * double(img(:, :, 3)) ...
+                    );
+                end
+
+                % Normalize grayscale image to [0, 1]
+                grayImg = double(grayImg) / 255;
+
+                % Calculate RMS contrast
+                meanLuminance = mean(grayImg(:));
+                rmsContrast = sqrt(mean((grayImg(:) - meanLuminance).^2));
+
+                % Store results in the table
+                contrastTable{rowIndex, 1} = rWeight;
+                contrastTable{rowIndex, 2} = gWeight;
+                contrastTable{rowIndex, 3} = bWeight;
+                contrastTable{rowIndex, 4} = rmsContrast;
+
+                rowIndex = rowIndex + 1;
+            end
+        end
+    end
+
+    % Display the contrast results in the table with tag 'weightsTable'
+    weightsTableHandle = findobj(handles.figure1, 'Tag', 'weightsTable');
+    if ~isempty(weightsTableHandle)
+        set(weightsTableHandle, 'Data', contrastTable, ...
+            'ColumnName', {'Red Weight', 'Green Weight', 'Blue Weight', 'RMS Contrast'});
+    else
+        errordlg('Could not find the table with tag "weightsTable".', 'Table Error');
+    end
+
 else
     % Show error if no image is loaded
     errordlg('No image uploaded. Please upload an image.', 'Image Not Loaded');
 end
+end
+
 
 
 % --- Executes on button press in convertToGrayscaleBtn.
@@ -220,15 +281,16 @@ function enhanceTumorEdges_Callback(hObject, eventdata, handles)
 
 % Check if the image is loaded
 if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
-    % Check if GrayImage is already stored
-    if isfield(handles, 'GrayImage') && ~isempty(handles.GrayImage)
-        img = handles.GrayImage; % Use the pre-stored grayscale image
-    else
-        img = handles.ImageData; % Retrieve the originally uploaded image
-        if size(img, 3) == 3 % Check if it's RGB
-            img = rgb2gray(img); % Convert to grayscale if needed
-        end
+    % Check if GrayImage is already stored 
+    % (Uncomment below if you need to get the more optimized filtering)
+    % if isfield(handles, 'GrayImage') && ~isempty(handles.GrayImage)
+    %     img = handles.GrayImage; % Use the pre-stored grayscale image
+    % else
+    img = handles.ImageData; % Retrieve the originally uploaded image
+    if size(img, 3) == 3 % Check if it's RGB
+        img = rgb2gray(img); % Convert to grayscale if needed
     end
+    % end
 
     % Thresholding: Adaptive thresholding for binarization
     binarizedImg = imbinarize(img, 'adaptive', 'Sensitivity', 0.59);
@@ -248,7 +310,7 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     % Calculating the center of the image
     xCenter = xSize / 2; % Horizontal center coordinate
     yCenter = ySize / 2; % Vertical center coordinate
-    
+
     % Defining radius for an elliptical mask
     xRadius = xCenter - 40; % Horizontal radius of the ellipse (adjusted a bit smaller than half the width)
     yRadius = yCenter - 50; % Vertical radius of the ellipse (adjusted a bit smaller than half the height)
@@ -256,11 +318,18 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     % Create a grid of coordinates representing the image dimensions
     % obtained above
     [col, row] = meshgrid(1:xSize, 1:ySize);
+    % Generate an elliptical mask
     mask = ((row - yCenter).^2 ./ yRadius^2) + ((col - xCenter).^2 ./ xRadius^2) <= 1;
+    % Apply elliptical mask to the enhanced image to isolate the tumor area
+    % Logical operation ensures the result is a binary image
     tumorMask = logical(enhancedImg .* mask);
+    % Filtering connected components based on size
     tumorMask = bwareafilt(tumorMask, [700 4000]);
+
+    % Perform morphological closing to smoothen the boundaries and fill small gaps
     maskStructuring = strel('disk', 6);
     tumorMask = imclose(tumorMask, maskStructuring);
+    % Fills the remaining holes
     tumorMask = imfill(tumorMask, 'holes');
 
     % Display the enhanced image, which went through Thresholding,
@@ -273,7 +342,7 @@ if isfield(handles, 'ImageData') && ~isempty(handles.ImageData)
     axes(handles.tumorDetectionMask);
     imshow(tumorMask);
     title('Tumor Detection Mask');
-    
+
     hold on;
     % Detect and overlay boundaries
     boundaries = bwboundaries(tumorMask, 'noholes');
