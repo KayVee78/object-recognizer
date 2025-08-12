@@ -12,7 +12,9 @@
 - **Histogram Generation**:   Creates a pixel intensity histogram for uploaded images, converting RGB to grayscale first if necessary.
 - **Tumour Edge Enhancement and Feature Extraction**: Processes grayscale images through a series of filters and morphological operations to enhance tumor edges and extract features for detection. This includes Gaussian filtering, contrast enhancement, adaptive thresholding, median filtering, morphological closing, and elliptical masking. Tumour boundaries are then extracted and plotted.
 
-
+<img width="556" height="412" alt="jpeg" src="https://github.com/user-attachments/assets/af195c6f-2e8a-4d03-8072-476ca96db6da" />
+<br/>
+<img width="555" height="409" alt="png" src="https://github.com/user-attachments/assets/ff285b10-6335-4385-8204-94fd7ac6d4b4" />
 
 ---
 
@@ -20,10 +22,6 @@
 
 Ensure that **Image Processing Toolbox** is installed/enabled in the Matlab environment.<br/>
 (If you have a license, install it via MATLAB Add-On Explorer)
-
-<img width="1113" height="824" alt="jpeg" src="https://github.com/user-attachments/assets/af195c6f-2e8a-4d03-8072-476ca96db6da" />
-<br/>
-<img width="1111" height="818" alt="png" src="https://github.com/user-attachments/assets/ff285b10-6335-4385-8204-94fd7ac6d4b4" />
 
 ---
 
